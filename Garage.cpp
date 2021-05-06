@@ -1,4 +1,4 @@
-#include<bits/stdc++.h>
+#include "bits/stdc++.h"
 #define ll long long
 // #define mod 1000000007
 using namespace std;
@@ -8,12 +8,180 @@ int ddx[8]={1,1,0,-1,-1,-1,0,1},ddy[8]={0,1,1,1,0,-1,-1,-1};
 int gcd(int a,int b){ if(!a)return b;return gcd(b%a,a);}
 int lcm(int a, int b) { return (a*b)/ gcd(a,b);}
 
+// All possible moves of a knight 
+int X[8] = { 2, 1, -1, -2, -2, -1, 1, 2 }; 
+int Y[8] = { 1, 2, 2, 1, -1, -2, -2, -1 }; 
 
-string toBinary(int n)
-{
-    string r;
-    while(n!=0) {r=(n%2==0 ?"0":"1")+r; n/=2;}
-    return r;
+
+// #include <ext/pb_ds/assoc_container.hpp> 
+// #include <ext/pb_ds/tree_policy.hpp> 
+// using namespace __gnu_pbds;
+
+// if(i < 0 | j < 0 || i >= n || j >= m || matrix[i][j] == 0 || vis[i][j] == 1) {
+//         return;
+// }
+
+namespace __primecheck {
+    unsigned mod_pow(unsigned a, unsigned b, unsigned mod) {
+        unsigned result = 1;
+
+        while (b > 0) {
+            if (b & 1)
+                result = unsigned(uint64_t(result) * a % mod);
+
+            a = unsigned(uint64_t(a) * a % mod);
+            b >>= 1;
+        }
+
+        return result;
+    }
+
+    bool miller_rabin(unsigned n) {
+        if (n < 2)
+            return false;
+
+        // Check small primes.
+        for (unsigned p : {2, 3, 5, 7, 11, 13, 17, 19, 23, 29})
+            if (n % p == 0)
+                return n == p;
+
+        int r = __builtin_ctz(n - 1);
+        unsigned d = (n - 1) >> r;
+
+        // https://en.wikipedia.org/wiki/Miller%E2%80%93Rabin_primality_test#Testing_against_small_sets_of_bases
+        for (unsigned a : {2, 7, 61}) {
+            unsigned x = mod_pow(a % n, d, n);
+
+            if (x <= 1 || x == n - 1)
+                continue;
+
+            for (int i = 0; i < r - 1 && x != n - 1; i++)
+                x = unsigned(uint64_t(x) * x % n);
+
+            if (x != n - 1)
+                return false;
+        }
+
+        return true;
+    }
+
+    int find_prime(int n) {
+        while (!miller_rabin(n))
+            n++;
+
+        return n;
+    }
+};
+using namespace __primecheck;
+
+// Galen Collins segment tree ( easy to understand but fix merge operation)
+
+
+
+
+inline namespace __segTree {
+    template <typename num_t> 
+    struct segtree {
+      int n, depth;
+      vector<num_t> tree, lazy;
+
+      void init(int s, vector<int>& arr) {
+        n = s;
+        tree = vector<num_t>(4 * s, 0);
+        lazy = vector<num_t>(4 * s, 0);
+        init(0, 0, n - 1, arr);
+      }
+
+      num_t init(int i, int l, int r, vector<int>& arr) {
+        if (l == r) return tree[i] = arr[l];
+
+        int mid = (l + r) / 2;
+        num_t a = init(2 * i + 1, l, mid, arr),
+              b = init(2 * i + 2, mid + 1, r, arr);
+        return tree[i] = a.op(b);
+      }
+
+      void update(int l, int r, num_t v) {
+        if (l > r) return;
+        update(0, 0, n - 1, l, r, v);
+      }
+
+      num_t update(int i, int tl, int tr, int ql, int qr, num_t v) {
+        eval_lazy(i, tl, tr);
+        
+        if (tl > tr || tr < ql || qr < tl) return tree[i];
+        if (ql <= tl && tr <= qr) {
+          lazy[i] = lazy[i].val + v.val;
+          eval_lazy(i, tl, tr);
+          return tree[i];
+        }
+        
+        if (tl == tr) return tree[i];
+
+        int mid = (tl + tr) / 2;
+        num_t a = update(2 * i + 1, tl, mid, ql, qr, v),
+              b = update(2 * i + 2, mid + 1, tr, ql, qr, v);
+        return tree[i] = a.op(b);
+      }
+
+      num_t query(int l, int r) {
+        if (l > r) return num_t::null_v;
+        return query(0, 0, n-1, l, r);
+      }
+
+      num_t query(int i, int tl, int tr, int ql, int qr) {
+        eval_lazy(i, tl, tr);
+        
+        if (ql <= tl && tr <= qr) return tree[i];
+        if (tl > tr || tr < ql || qr < tl) return num_t::null_v;
+
+        int mid = (tl + tr) / 2;
+        num_t a = query(2 * i + 1, tl, mid, ql, qr),
+              b = query(2 * i + 2, mid + 1, tr, ql, qr);
+        return a.op(b);
+      }
+
+      void eval_lazy(int i, int l, int r) {
+        tree[i] = tree[i].lazy_op(lazy[i], (r - l + 1));
+        if (l != r) {
+          lazy[i * 2 + 1] = lazy[i].val + lazy[i * 2 + 1].val;
+          lazy[i * 2 + 2] = lazy[i].val + lazy[i * 2 + 2].val;
+        }
+
+        lazy[i] = num_t();
+      }
+    };
+
+
+
+
+    struct nums_t {
+      long long val;
+      static const long long null_v = 0;
+
+      nums_t(): val(0) {}
+      nums_t(long long v): val(v) {}
+
+      nums_t op(nums_t& other) {
+        return nums_t(val + other.val);
+      }
+      
+      nums_t lazy_op(nums_t& v, int size) {
+        return nums_t(val + v.val);
+      }
+    };
+
+
+    // segtree<nums_t> st;
+}
+
+
+
+
+string decimalToBinary(int n) 
+{   
+    string s = bitset<64> (n).to_string();
+    return s;
 }
 
 
@@ -22,7 +190,7 @@ bool isVowel(char x) {
 }
 
 
-const int mod = 1e9 + 7;
+const int mod = 1e9 + 7; 
 
 // a power to b mod m
 // (a^b) % m
@@ -60,7 +228,7 @@ int divide(int a, int b) {
 struct Sieve {
   int n;
   vector<int> f, primes;
-  Sieve(int n=1):n(n), f(n+1) {
+  Sieve(int n=2e6 + 10):n(n), f(n+1) {
     f[0] = f[1] = -1;
     for (ll i = 2; i <= n; ++i) {
       if (f[i]) continue;
@@ -88,7 +256,7 @@ struct Sieve {
     for (int p : fl) {
       if (res.back().first == p) {
         res.back().second++;
-      } else {
+      } else {  
         res.push_back(make_pair(p, 1));
       }
     }
@@ -113,212 +281,11 @@ bool ispower2(int x) {
 
 
 
-// GCD
-
-int gcd(int a, int b) {
-    if (!a || !b)
-        return a | b;
-    unsigned shift = __builtin_ctz(a | b);
-    a >>= __builtin_ctz(a);
-    do {
-        b >>= __builtin_ctz(b);
-        if (a > b)
-            swap(a, b);
-        b -= a;
-    } while (b);
-    return a << shift;
-}
-
-// Fcatorial
-
-ll fact(ll n) 
-{ 
-    ll res = 1; 
-    for (ll i = 2; i <= n; i++) 
-        res = res * i; 
-    return res; 
-} 
-
-
-// Calcculate fibonnaci
-
-pair<int, int> fib (int n) {
-    if (n == 0)
-        return {0, 1};
-
-    auto p = fib(n >> 1);
-    int c = p.first * (2 * p.second - p.first);
-    int d = p.first * p.first + p.second * p.second;
-    if (n & 1)
-        return {d, c + d};
-    else
-        return {c, d};
-}
-
-/*
-
-using this formula
-
-F(2k) = F(k) * ( 2*F(k+1) - F(k))
-
-F(2k+1) = F(k+1) * F(k+1) + F(k) * F(k)
-
-
-*/
-
-
-// Gcd with coeff
-
-int gcd(int a, int b, int& x, int& y) {
-    if (b == 0) {
-        x = 1;
-        y = 0;
-        return a;
-    }
-    int x1, y1;
-    int d = gcd(b, a % b, x1, y1);
-    x = y1;
-    y = x1 - y1 * (a / b);
-    return d;
-}
-
-// Iterative
-
-int gcd(int a, int b, int& x, int& y) {
-    x = 1, y = 0;
-    int x1 = 0, y1 = 1, a1 = a, b1 = b;
-    while (b1) {
-        int q = a1 / b1;
-        tie(x, x1) = make_tuple(x1, x - q * x1);
-        tie(y, y1) = make_tuple(y1, y - q * y1);
-        tie(a1, b1) = make_tuple(b1, a1 - q * b1);
-    }
-    return a1;
-}
-
-
-// Find any solution of ax + by = c
-
-int gcd(int a, int b, int& x, int& y) {
-    if (b == 0) {
-        x = 1;
-        y = 0;
-        return a;
-    }
-    int x1, y1;
-    int d = gcd(b, a % b, x1, y1);
-    x = y1;
-    y = x1 - y1 * (a / b);
-    return d;
-}
-
-
-
-
-// check whether the number is prime or not 
-
-
-
-// using u64 = uint64_t;
-// using u128 = __uint128_t;
-
-// u64 binpower(u64 base, u64 e, u64 mod) {
-//     u64 result = 1;
-//     base %= mod;
-//     while (e) {
-//         if (e & 1)
-//             result = (u128)result * base % mod;
-//         base = (u128)base * base % mod;
-//         e >>= 1;
-//     }
-//     return result;
-// }
-
-
-
-
-
-
-// bool check_composite(u64 n, u64 a, u64 d, int s) {
-//     u64 x = binpower(a, d, n);
-//     if (x == 1 || x == n - 1)
-//         return false;
-//     for (int r = 1; r < s; r++) {
-//         x = (u128)x * x % n;
-//         if (x == n - 1)
-//             return false;
-//     }
-//     return true;
-// };
-
-
-// bool MillerRabin(u64 n) { // returns true if n is prime, else returns false.
-//     if (n < 2)
-//         return false;
-
-//     int r = 0;
-//     u64 d = n - 1;
-//     while ((d & 1) == 0) {
-//         d >>= 1;
-//         r++;
-//     }
-
-//     for (int a : {2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37}) {
-//         if (n == a)
-//             return true;
-//         if (check_composite(n, a, d, r))
-//             return false;
-//     }
-//     return true;
-// }
-
-
-
-// Sieve of Eratosthenes
-// https://youtu.be/UTVg7wzMWQc?t=2774
-struct Sieve {
-  int n;
-  vector<int> f, primes;
-  Sieve(int n=1):n(n), f(n+1) {
-    f[0] = f[1] = -1;
-    for (ll i = 2; i <= n; ++i) {
-      if (f[i]) continue;
-      primes.push_back(i);
-      f[i] = i;
-      for (ll j = i*i; j <= n; j += i) {
-        if (!f[j]) f[j] = i;
-      }
-    }
-  }
-  bool isPrime(int x) { return f[x] == x;}
-  vector<int> factorList(int x) {
-    vector<int> res;
-    while (x != 1) {
-      res.push_back(f[x]);
-      x /= f[x];
-    }
-    return res;
-  }
-
-  vector<pair<int,int> > factor(int x) {
-    vector<int> fl = factorList(x);
-    if (fl.size() == 0) return vector<pair<int,int> >();
-    vector<pair<int,int> > res(1, make_pair(fl[0], 0));
-    for (int p : fl) {
-      if (res.back().first == p) {
-        res.back().second++;
-      } else {
-        res.push_back(make_pair(p, 1));
-      }
-    }
-    return res;
-  }
-};
 
 // ncr of large numbers
 
 
-const int MAX = 510000;
+const int MAX = 2e6 + 10;
 long long fac[MAX], finv[MAX], inv[MAX];
  
 void COMinit() {
@@ -331,9 +298,7 @@ void COMinit() {
     finv[i] = finv[i - 1] * inv[i] % mod;
   }
 }
- 
- 
- 
+
 long long COM(int n, int k){
   if (n < k) return 0;
   if (n < 0 || k < 0) return 0;
@@ -342,24 +307,7 @@ long long COM(int n, int k){
 
 
 
-// Factors count 
-int trial_division4(long long n) {
-    vector<int> primes; // Get it using sieves
-    int cnt = 0;
-    int ans = 0;
-    for (long long d : primes) {
-        if (d * d > n)
-            break;
-        while (n % d == 0) {
-            cnt++;
-            n /= d;
-        }
-    }
-    if (n > 1)
-        cnt++;
-    
-    return cnt;
-}
+
 
 // Number of factors
 
@@ -396,10 +344,8 @@ void generatePrimeFactors()
         } 
     } 
 } 
-  
+ 
 // function to calculate number of factors 
-
-
 int calculateNoOFactors(int n) 
 { 
     if (n == 1) 
@@ -452,6 +398,29 @@ int LIS(vector<int> array, int n)  {
         }
     }
     return ans.size();
+} 
+
+int lcs(string X, string Y, int m, int n){
+    int L[m + 1][n + 1];
+    int i, j;
+  
+    /* Following steps build L[m+1][n+1] in bottom up fashion. Note 
+      that L[i][j] contains length of LCS of X[0..i-1] and Y[0..j-1] */
+    for (i = 0; i <= m; i++) {
+        for (j = 0; j <= n; j++) {
+            if (i == 0 || j == 0)
+                L[i][j] = 0;
+  
+            else if (X[i - 1] == Y[j - 1])
+                L[i][j] = L[i - 1][j - 1] + 1;
+  
+            else
+                L[i][j] = max(L[i - 1][j], L[i][j - 1]);
+        }
+    }
+  
+    /* L[m][n] contains length of LCS for X[0..n-1] and Y[0..m-1] */
+    return L[m][n];
 }
 
 
@@ -511,50 +480,11 @@ vector<int> lps(string S) {
     return z;
 }
 
-vector<int> parent(1e6 + 10,-1);
-vector<int> conatiner(1e6 + 10,0);
-
-
-int find_set(int v) {
-    if (v == parent[v])
-        return v;
-    return parent[v] = find_set(parent[v]);
-}
-
-void make_set(int v) {
-    parent[v] = v;
-    conatiner[v] = 1;
-}
-
-void union_sets(int a, int b) {
-    a = find_set(a);
-    b = find_set(b);
-    if (a != b) {
-        if (conatiner[a] < conatiner[b])
-            swap(a, b);
-        parent[b] = a;
-        conatiner[a] += conatiner[b];
-    }
-}
-
-// void union_sets(int a, int b) {
-//     a = find_set(a).first;
-//     b = find_set(b).first;
-//     if (a != b) {
-//         if (rank[a] < rank[b])
-//             swap(a, b);
-//         parent[b] = make_pair(a, 1);
-//         if (rank[a] == rank[b])
-//             rank[a]++;
-//     }
-// }
-
 
 // Sum queries in Segment Tree
 
 
 int n, t[4*N];
-
 
 void build(int a[], int v, int tl, int tr) {
     if (tl == tr) {
@@ -577,7 +507,6 @@ int sum(int v, int tl, int tr, int l, int r) {
     return sum(v*2, tl, tm, l, min(r, tm))
            + sum(v*2+1, tm+1, tr, max(l, tm+1), r);
 }
-
 
 void update(int v, int tl, int tr, int pos, int new_val) {
     if (tl == tr) {
@@ -633,25 +562,8 @@ int get(int v, int tl, int tr, int pos) {
 
 // RMQ
 
-int minVal(int x, int y) { return (x < y)? x: y; }  
-  
-// A utility function to get the  
-// middle index from corner indexes.  
+int minVal(int x, int y) { return (x < y)? x: y; }   
 int getMid(int s, int e) { return s + (e -s)/2; }  
-  
-/* A recursive function to get the 
-minimum value in a given range  
-of array indexes. The following  
-are parameters for this function.  
-  
-    st --> Pointer to segment tree  
-    index --> Index of current node in the  
-           segment tree. Initially 0 is  
-           passed as root is always at index 0  
-    ss & se --> Starting and ending indexes  
-                of the segment represented  
-                by current node, i.e., st[index]  
-    qs & qe --> Starting and ending indexes of query range */
 int RMQUtil(int *st, int ss, int se, int qs, int qe, int index)  
 {  
     // If segment of this node is a part  
@@ -670,11 +582,7 @@ int RMQUtil(int *st, int ss, int se, int qs, int qe, int index)
     int mid = getMid(ss, se);  
     return minVal(RMQUtil(st, ss, mid, qs, qe, 2*index+1),  
                 RMQUtil(st, mid+1, se, qs, qe, 2*index+2));  
-}  
-  
-// Return minimum of elements in range 
-// from index qs (query start) to  
-// qe (query end). It mainly uses RMQUtil()  
+}   
 int RMQ(int *st, int n, int qs, int qe)  
 {  
     // Check for erroneous input values  
@@ -686,12 +594,7 @@ int RMQ(int *st, int n, int qs, int qe)
   
     return RMQUtil(st, 0, n-1, qs, qe, 0);  
 }  
-  
-// A recursive function that constructs 
-// Segment Tree for array[ss..se].  
-// si is index of current node in segment tree st  
-int constructSTUtil(int arr[], int ss, int se, 
-                                int *st, int si)  
+int constructSTUtil(int arr[], int ss, int se, int *st, int si)  
 {  
     // If there is one element in array, 
     // store it in current node of  
@@ -710,11 +613,6 @@ int constructSTUtil(int arr[], int ss, int se,
                     constructSTUtil(arr, mid+1, se, st, si*2+2));  
     return st[si];  
 }  
-  
-/* Function to construct segment tree  
-from given array. This function allocates 
-memory for segment tree and calls constructSTUtil() to  
-fill the allocated memory */
 int *constructST(int arr[], int n)  
 {  
     // Allocate memory for segment tree  
@@ -893,3 +791,257 @@ void topological_sort() {
     }
     reverse(ans.begin(), ans.end());
 }
+
+
+// RMQ
+class SegmentTree{
+	long long n ;
+	vector<long long>A,st;
+	
+	long long left(long long p)
+	{
+		return (p<<1);
+	}
+	
+	long long right(long long p)
+	{
+		return (p<<1)+1;
+	}
+	
+	void build(long long p,long long l,long long r)
+	{
+		if(l==r)
+		st[p]=l;
+		else
+		{
+			build(left(p),l,(l+r)/2);
+			build(right(p),((l+r)/2)+1,r);
+			long long li=st[left(p)];
+			long long ri=st[right(p)];
+			
+			if(A[li]<A[ri])
+			st[p]=li;
+			else
+			st[p]=ri;				
+		}
+	}
+	
+	long long rmq(long long p,long long l,long long r,long long i,long long j)
+	{
+		if(i>r || j<l)
+		return -1;
+		else if(l>=i && r<=j)
+		return st[p];
+		
+		long long li=rmq(left(p),l,(l+r)/2,i,j);
+		long long ri=rmq(right(p),((l+r)/2)+1,r,i,j);
+		
+		if(li==-1)
+		return ri;
+		else if(ri==-1)
+		return li;
+		else
+		{
+			if(A[li]<A[ri])
+			return li;
+			else
+			return ri;
+		}
+	}
+	
+	public:
+		SegmentTree(const vector<long long> &_A)
+		{
+			A=_A;
+			n=(long long)(A.size());
+			st.assign(4*n,0);
+			build(1,0,n-1);
+		}
+		
+		long long rmq(long long i,long long j)
+		{
+			return rmq(1,0,n-1,i,j);
+		}
+};
+
+
+
+
+
+
+
+template<typename T>
+class SegmentTree {
+private: 
+	int n;
+	vector<T> tree;
+	vector<T> lazy;
+ 
+	int left(int pos) {
+		return (pos << 1) + 1;
+	}
+ 
+	int right(int pos) {
+		return (pos << 1) + 2;
+	}
+ 
+	int mid(int l, int r) {
+		return ((l + r) >> 1);
+	}
+ 
+	T identity() {
+		return 0;
+	}
+ 
+	T combine(T left, T right) {
+		return left + right;
+	}
+ 
+	void lazyUpdate(int pos, int l, int r) {
+		if(lazy[pos] == -1) return;
+		tree[pos] = lazy[pos] * (r - l + 1);
+		if(l != r) {
+			lazy[left(pos)] = lazy[pos];
+			lazy[right(pos)] = lazy[pos];
+		}
+		lazy[pos] = -1;
+	}
+ 
+	void build(int pos, int l, int r, vector<T> &arr) {
+		if(l == r) {
+			tree[pos] = arr[l];
+		} else {
+			build(left(pos), l, mid(l, r), arr);
+			build(right(pos), mid(l, r) + 1, r, arr);
+			tree[pos] = combine(tree[left(pos)], tree[right(pos)]);
+		}
+	}
+ 
+	T query(int pos, int l, int r, int L, int R) {
+		lazyUpdate(pos, l, r);
+		if(r < L || l > R || l > r) {
+			return identity();
+		}
+		if(L <= l && r <= R) {
+			return tree[pos];
+		}
+		T q1 = query(left(pos), l, mid(l, r), L, R);
+		T q2 = query(right(pos), mid(l, r) + 1, r, L, R);
+		return combine(q1, q2);
+	}
+ 
+	void update(int pos, int l, int r, int L, int R, int val) {
+		lazyUpdate(pos, l, r);
+		if(r < L || l > R || l > r) {
+			return;
+		}
+		if(L <= l && r <= R) {
+			lazy[pos] = val;
+			lazyUpdate(pos, l, r);
+			return;
+		}
+		update(left(pos), l, mid(l, r), L, R, val);
+		update(right(pos), mid(l, r) + 1, r, L, R, val);
+		tree[pos] = combine(tree[left(pos)], tree[right(pos)]);
+	}
+ 
+public:
+	SegmentTree(vector<T> arr) {
+		n = arr.size();
+		tree.assign(4 * n, 0);
+		lazy.assign(4 * n, -1);
+		build(0, 0, n - 1, arr);
+	}
+ 
+	T query(int l, int r) {
+		return query(0, 0, n - 1, l, r);
+	}
+ 
+	void update(int l, int r, int val) {
+		update(0, 0, n - 1, l, r, val);
+	}
+};
+ 
+
+ // Trie
+ class Trie {
+    public:
+    Trie *child[26];
+    bool isend;
+    Trie() {
+        for(int i=0; i<26; i++) {
+            child[i] = NULL;
+        }
+        isend = false;
+    }
+
+    void add(string s) {    
+        int n = sz(s);
+        Trie *curr = this;
+        for(int i=0; i<n; i++) {
+            int v = s[i] - 'a';
+            if(curr->child[v] == NULL) {
+                curr->child[v] = new Trie();
+            } 
+            curr = curr -> child[v];
+        }
+        curr->isend  = true;
+    }
+
+    bool exists(string word) {
+        Trie *curr = this;
+        if(curr == NULL) {
+            return false;
+        }
+        int n = sz(word);
+        for(int i=0; i<n; i++) {
+            int v = word[i] - 'a';
+            if(curr->child[v] == NULL) {
+                return false;
+            }
+            curr = curr -> child[v];
+        }
+
+        return curr->isend;
+    }
+
+    bool startswith(string p) {
+        Trie *curr = this;
+        if(curr == NULL) {
+            return false;
+        }
+        int n = sz(p);
+        for(int i=0; i<n; i++) {
+            int v = p[i] - 'a';
+            if(curr->child[v] == NULL) {
+                return false;
+            }
+            curr = curr -> child[v];
+        }
+        return true;
+    }
+    bool fun(string word, Trie *curr) {
+        if(curr == NULL) {
+            return false;
+        }
+        int n = sz(word);
+        bool ans = false;
+        int i=0;
+        for(i=0; i<n; i++) {
+            if(word[i] == '.') {
+                for(int j=0; j<26; j++) {
+                    ans = ans || fun(word.substr(i+1), curr->child[j]);
+                }
+                return ans;
+            }
+            int v = word[i] - 'a';
+            if(curr->child[v] == NULL) {
+                return false;
+            }
+            curr = curr -> child[v];
+        }
+
+        return curr->isend;
+    }
+};
+
